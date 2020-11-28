@@ -19,7 +19,7 @@ defmodule PTA.MixProject do
 
   defp deps do
     [
-	  {:gen_smtp, "~> 1.0"}
+      {:gen_smtp, "~> 1.0"}
     ]
   end
 end
