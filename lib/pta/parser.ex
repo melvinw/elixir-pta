@@ -3,12 +3,8 @@ defmodule PTA.Parser do
   TODO
   """
 
-  @doc """
-  Partition `tokens` at the first token for which `pred` evaluates to true.
-  If `inclusive` is true, the token that matched `pred` will be included in the second returned partition.
-
-  Returns: `{list(String.t()), list(String.t())}`
-  """
+  # Partition `tokens` at the first token for which `pred` evaluates to true.
+  # If `inclusive` is true, the token that matched `pred` will be included in the second returned partition.
   def _eat(tokens, pred \\ fn p -> p == "\n" end, inclusive \\ false) do
     case tokens do
       [h | tail] ->
@@ -28,9 +24,13 @@ defmodule PTA.Parser do
     end
   end
 
-  @spec parse(String.t()) :: PTA.Journal.t()
+  @doc """
+  Parses the journal in `src` and returns a `PTA.Journal` containing the accounts and transactions found.
+  """
+  @spec parse(String.t()) :: {:ok, PTA.Journal.t()}
+  @spec parse(String.t()) :: {:error, String.t()}
   def parse(src) do
-    tokens = tokenize(String.split(src, "", trim: true))
+    tokens = _tokenize(String.split(src, "", trim: true))
     _journal(tokens)
   end
 
@@ -198,31 +198,27 @@ defmodule PTA.Parser do
     end
   end
 
+  # Splits the given character list into tokens.
   # String.split\2 would be perfect here, but we need to treat newlines as separate tokens.
-  @doc """
-  Splits the given character list into tokens.
-
-  Returns `list(String.t())`
-  """
-  @spec tokenize(list(String.t()), list(String.t())) :: list(String.t())
-  def tokenize(chars, acc \\ []) do
+  @spec _tokenize(list(String.t()), list(String.t())) :: list(String.t())
+  def _tokenize(chars, acc \\ []) do
     case chars do
       [head | tail] ->
         cond do
           head == " " or head == "\t" ->
             case acc do
-              [_ | _] -> [for(c <- acc, into: "", do: c) | tokenize(tail, [])]
-              _ -> tokenize(tail, [])
+              [_ | _] -> [for(c <- acc, into: "", do: c) | _tokenize(tail, [])]
+              _ -> _tokenize(tail, [])
             end
 
           head == "\n" ->
             case acc do
-              [_ | _] -> [for(c <- acc, into: "", do: c)] ++ [head | tokenize(tail, [])]
-              _ -> tokenize(tail, [])
+              [_ | _] -> [for(c <- acc, into: "", do: c)] ++ [head | _tokenize(tail, [])]
+              _ -> _tokenize(tail, [])
             end
 
           true ->
-            tokenize(tail, acc ++ [head])
+            _tokenize(tail, acc ++ [head])
         end
 
       _ ->
