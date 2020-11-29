@@ -58,6 +58,15 @@ defmodule PTA.Parser do
                 {:error, reason}
             end
 
+          {:ok, remaining} ->
+            case _journal(remaining) do
+              {:ok, j} ->
+                {:ok, j}
+
+              {:error, reason} ->
+                {:error, reason}
+            end
+
           {:error, reason} ->
             {:error, reason}
         end
@@ -72,6 +81,7 @@ defmodule PTA.Parser do
 
   @spec _journal_item(list(String.t())) :: {:ok, PTA.Transaction.t(), list(String.t())}
   @spec _journal_item(list(String.t())) :: {:ok, PTA.Account.t(), list(String.t())}
+  @spec _journal_item(list(String.t())) :: {:ok, list(String.t())}
   @spec _journal_item(list(String.t())) :: {:error, String.t()}
   def _journal_item(tokens) do
     case tokens do
@@ -82,6 +92,16 @@ defmodule PTA.Parser do
               {:ok, t, remaining} -> {:ok, t, remaining}
               {:error, reason} -> {:error, reason}
             end
+
+          head == "account" ->
+            # TODO: process account stanzas
+            {_, remaining} = _eat(tokens)
+            {:ok, remaining}
+
+          head == "include" ->
+            # TODO: process includes
+            {_, remaining} = _eat(tokens)
+            {:ok, remaining}
 
           true ->
             {:error, "got unknown token"}
@@ -108,8 +128,8 @@ defmodule PTA.Parser do
                 cleared: hd(acc) != "!",
                 payee:
                   case acc do
-                    [h | t] when h == "!" or h == "*" -> for c <- t, into: "", do: c
-                    _ -> for c <- acc, into: "", do: c
+                    [h | t] when h == "!" or h == "*" -> Enum.join(t, " ")
+                    _ -> Enum.join(acc, " ")
                   end,
                 postings: postings
               },
@@ -150,6 +170,7 @@ defmodule PTA.Parser do
         {:error, "empty token list"}
 
       String.match?(hd(acc), ~r/^;/) ->
+        # TODO: should collect line comments like this somewhow
         _posting(remaining)
 
       String.match?(hd(acc), ~r/\d{4}\/\d{2}\/\d{1,2}/) ->
@@ -157,7 +178,30 @@ defmodule PTA.Parser do
 
       true ->
         # TODO: parse tags from `comment_parts`
-        {posting_parts, _comment_parts} = _eat(acc, fn p -> p == ";" end)
+        {posting_parts, comment_parts} =
+          _eat(acc, fn p -> String.match?(p, ~r/;/) end, inclusive: true)
+
+        {posting_parts, comment_parts} =
+          case comment_parts do
+            [h | t] ->
+              case String.split(h, ";", trim: true) do
+                [ppart | cparts] ->
+                  {posting_parts ++ [ppart], cparts ++ t}
+
+                _ ->
+                  {posting_parts, t}
+              end
+
+            _ ->
+              {posting_parts, comment_parts}
+          end
+
+        comment =
+          if length(comment_parts) > 0 do
+            Enum.join(comment_parts, " ")
+          else
+            nil
+          end
 
         {account_parts, amount_parts} =
           _eat(posting_parts, fn p -> String.match?(p, ~r/^(-?\d+\.?\d*)(.*)$/) end,
@@ -169,7 +213,7 @@ defmodule PTA.Parser do
 
         case posting_parts do
           [account] ->
-            {:ok, %PTA.Posting{account: account}, remaining}
+            {:ok, %PTA.Posting{account: account, comment: comment}, remaining}
 
           [account, trailer] ->
             case Regex.run(~r/^(-?\d+\.?\d*)(.*)$/, trailer) do
@@ -177,7 +221,8 @@ defmodule PTA.Parser do
                 {:ok,
                  %PTA.Posting{
                    account: account,
-                   amount: %PTA.Amount{quantity: Float.parse(quant), commodity: commodity}
+                   amount: %PTA.Amount{quantity: Float.parse(quant), commodity: commodity},
+                   comment: comment
                  }, remaining}
 
               _ ->
@@ -188,7 +233,8 @@ defmodule PTA.Parser do
             {:ok,
              %PTA.Posting{
                account: account,
-               amount: %PTA.Amount{quantity: Float.parse(quant), commodity: commodity}
+               amount: %PTA.Amount{quantity: Float.parse(quant), commodity: commodity},
+               comment: comment
              }, remaining}
 
           _ ->

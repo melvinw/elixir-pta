@@ -28,12 +28,14 @@ defmodule PTA do
   defmodule Posting do
     defstruct account: nil,
               amount: nil,
-              tags: nil
+              tags: nil,
+              comment: nil
 
     @type t :: %Posting{
             account: Account.t(),
             amount: Amount.t(),
-            tags: %{String.t() => String.t()}
+            tags: %{String.t() => String.t()},
+            comment: String.t()
           }
   end
 
@@ -42,14 +44,16 @@ defmodule PTA do
               cleared: nil,
               payee: nil,
               postings: nil,
-              tags: nil
+              tags: nil,
+              comment: nil
 
     @type t :: %Transaction{
             date: String.t(),
             cleared: boolean(),
             payee: String.t(),
             postings: list(Posting.t()),
-            tags: %{String.t() => String.t()}
+            tags: %{String.t() => String.t()},
+            comment: String.t()
           }
   end
 
