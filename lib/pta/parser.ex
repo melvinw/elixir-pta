@@ -84,8 +84,7 @@ defmodule PTA.Parser do
             end
 
           true ->
-            {:ok, %PTA.Account{}, []}
-            # {:error, "got unknown token"}
+            {:error, "got unknown token"}
         end
 
       _ ->
