@@ -153,6 +153,7 @@ defmodule PTA.Parser do
   end
 
   @spec _transaction(list(String.t())) :: {:ok, list(PTA.Posting.t()), list(String.t())}
+  @spec _transaction(list(String.t())) :: {:txn_end, list(String.t())}
   @spec _transaction(list(String.t())) :: {:error, String.t()}
   def _postings(tokens) do
     tokens =
@@ -165,8 +166,12 @@ defmodule PTA.Parser do
       {:ok, p, remaining} ->
         case _postings(remaining) do
           {:ok, postings, leftover} -> {:ok, [p | postings], leftover}
-          {:error, _} -> {:ok, [p], remaining}
+          {:txn_end, remaining} -> {:ok, [p], remaining}
+          {:error, reason} -> {:error, reason}
         end
+
+      :txn_end ->
+        {:txn_end, tokens}
 
       {:error, reason} ->
         {:error, reason}
@@ -174,16 +179,17 @@ defmodule PTA.Parser do
   end
 
   @spec _posting(list(String.t())) :: {:ok, PTA.Posting.t(), list(String.t())}
+  @spec _posting(list(String.t())) :: :txn_end
   @spec _posting(list(String.t())) :: {:error, String.t()}
   def _posting(tokens) do
     {acc, remaining} = _eat(tokens)
 
     cond do
       acc == [] ->
-        {:error, "empty token list"}
+        :txn_end
 
       String.match?(hd(acc), ~r/\d{4}\/\d{2}\/\d{1,2}/) ->
-        {:error, "end of transaction"}
+        :txn_end
 
       true ->
         # TODO: parse tags from `comment_parts`
