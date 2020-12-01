@@ -155,6 +155,12 @@ defmodule PTA.Parser do
   @spec _transaction(list(String.t())) :: {:ok, list(PTA.Posting.t()), list(String.t())}
   @spec _transaction(list(String.t())) :: {:error, String.t()}
   def _postings(tokens) do
+    tokens =
+      case tokens do
+        ["\n" | tail] -> tail
+        _ -> tokens
+      end
+
     case _posting(tokens) do
       {:ok, p, remaining} ->
         case _postings(remaining) do
