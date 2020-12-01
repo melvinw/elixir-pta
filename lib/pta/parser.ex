@@ -195,8 +195,17 @@ defmodule PTA.Parser do
             inclusive: true
           )
 
-        account = Enum.join(account_parts, " ")
-        posting_parts = [account] ++ amount_parts
+        account =
+          case account_parts do
+            [] -> nil
+            _ -> Enum.join(account_parts, " ")
+          end
+
+        posting_parts =
+          case account_parts do
+            [] -> amount_parts
+            _ -> [account] ++ amount_parts
+          end
 
         case posting_parts do
           [account] ->
@@ -223,6 +232,9 @@ defmodule PTA.Parser do
                amount: %PTA.Amount{quantity: Float.parse(quant), commodity: commodity},
                comment: comment
              }, remaining}
+
+          [] when comment != nil ->
+            {:ok, %PTA.Posting{comment: comment}, remaining}
 
           _ ->
             {:error, "invalid posting"}
