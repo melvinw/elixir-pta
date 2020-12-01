@@ -85,13 +85,20 @@ defmodule PTA.Parser do
   @spec _journal_item(list(String.t())) :: {:error, String.t()}
   def _journal_item(tokens) do
     case tokens do
-      [head | _] ->
+      [head | tail] ->
         cond do
           String.match?(head, ~r/\d{4}\/\d{2}\/\d{1,2}/) ->
             case _transaction(tokens) do
               {:ok, t, remaining} -> {:ok, t, remaining}
               {:error, reason} -> {:error, reason}
             end
+
+          head == "\n" ->
+            {:ok, tail}
+
+          head == ";" ->
+            {_, remaining} = _eat(tokens)
+            {:ok, remaining}
 
           head == "account" ->
             # TODO: process account stanzas
@@ -169,32 +176,12 @@ defmodule PTA.Parser do
       acc == [] ->
         {:error, "empty token list"}
 
-      String.match?(hd(acc), ~r/^;/) ->
-        # TODO: should collect line comments like this somewhow
-        _posting(remaining)
-
       String.match?(hd(acc), ~r/\d{4}\/\d{2}\/\d{1,2}/) ->
         {:error, "end of transaction"}
 
       true ->
         # TODO: parse tags from `comment_parts`
-        {posting_parts, comment_parts} =
-          _eat(acc, fn p -> String.match?(p, ~r/;/) end, inclusive: true)
-
-        {posting_parts, comment_parts} =
-          case comment_parts do
-            [h | t] ->
-              case String.split(h, ";", trim: true) do
-                [ppart | cparts] ->
-                  {posting_parts ++ [ppart], cparts ++ t}
-
-                _ ->
-                  {posting_parts, t}
-              end
-
-            _ ->
-              {posting_parts, comment_parts}
-          end
+        {posting_parts, comment_parts} = _eat(acc, fn p -> p == ";" end)
 
         comment =
           if length(comment_parts) > 0 do
@@ -256,10 +243,10 @@ defmodule PTA.Parser do
               _ -> _tokenize(tail, [])
             end
 
-          head == "\n" ->
+          head == "\n" or head == ";" ->
             case acc do
               [_ | _] -> [for(c <- acc, into: "", do: c)] ++ [head | _tokenize(tail, [])]
-              _ -> _tokenize(tail, [])
+              _ -> [head | _tokenize(tail, [])]
             end
 
           true ->
